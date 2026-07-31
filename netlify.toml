@@ -7,5 +7,5 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Planner routes call Gemini and often exceed Netlify's default 10s function limit.
-# On Pro+, ask Netlify support to raise your site timeout to 26s (their maximum).
+# Planner routes call Gemini. Their route handlers request Netlify's 60-second
+# synchronous function duration (see maxDuration in the API route files).

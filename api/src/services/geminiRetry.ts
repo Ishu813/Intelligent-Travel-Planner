@@ -7,9 +7,7 @@ import { isServerlessRuntime } from "./runtime";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function maxAttemptsPerModel() {
-  // Retrying after a slow request makes a Netlify function exceed its
-  // synchronous deadline. Let the client retry the small, individual chunk.
-  if (isServerlessRuntime()) return 1;
+  if (isServerlessRuntime()) return 2;
   const fromEnv = Number(process.env.GEMINI_MAX_ATTEMPTS);
   if (Number.isFinite(fromEnv) && fromEnv >= 1) return Math.floor(fromEnv);
   return 5;
@@ -61,21 +59,9 @@ export async function generateContentWithRetry(
 
   for (const mid of chain) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const serverless = isServerlessRuntime();
-      const model = genAI.getGenerativeModel({
-        model: mid,
-        generationConfig: {
-          responseMimeType: "application/json",
-          // Chunked planner requests are one day long in serverless hosts.
-          // Bounding the response avoids a slow, excessively verbose answer.
-          ...(serverless ? { maxOutputTokens: 2048 } : {}),
-        },
-      });
+      const model = genAI.getGenerativeModel({ model: mid });
       try {
-        return await model.generateContent(
-          prompt,
-          serverless ? { timeout: 8_500 } : undefined,
-        );
+        return await model.generateContent(prompt);
       } catch (e) {
         lastErr = e;
         if (!isRetryableGeminiError(e) || attempt === maxAttempts) {

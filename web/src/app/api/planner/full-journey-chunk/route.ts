@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateFullJourneyChunk } from "@trip-planner/api/full-journey";
 
-export const maxDuration = 26;
+export const maxDuration = 60;
 
 const fullTripZ = z.object({
   from: z.string().min(1),

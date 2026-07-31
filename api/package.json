@@ -1,0 +1,43 @@
+{
+  "name": "@trip-planner/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./full-journey": "./src/services/fullJourney.ts"
+  },
+  "scripts": {
+    "predev": "node scripts/free-port.mjs 3001",
+    "dev": "dotenv -e ../.env -- tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "dotenv -e ../.env -- node dist/index.js",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@trip-planner/shared": "0.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "jsonrepair": "^3.14.0",
+    "next-auth": "^4.24.11",
+    "pg": "^8.16.0",
+    "uuid": "^11.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^4.17.23",
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^8.57.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

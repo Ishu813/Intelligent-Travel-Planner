@@ -314,6 +314,118 @@ function buildFullJourneyPrompt(trip: FullTripInput) {
   ].join("\n");
 }
 
+export type JourneyChunkContext = {
+  lastCity?: string;
+  lastHotel?: string;
+  daysSoFarCost?: number;
+};
+
+const ChunkPlanSchema = z.object({
+  days: z.array(JourneyDaySchema).min(1),
+  mapRoute: z.array(MapRouteSegmentSchema).default([]),
+});
+
+function buildChunkPrompt(
+  trip: FullTripInput,
+  fromDay: number,
+  toDay: number,
+  context?: JourneyChunkContext,
+) {
+  const chunkDays = toDay - fromDay + 1;
+  const chunkStartDate = addDays(trip.startDate, fromDay - 1);
+  const chunkEndDate = addDays(trip.startDate, toDay - 1);
+  const chunkBudget = Math.round((trip.budgetInr * chunkDays) / trip.days);
+
+  return [
+    "You are an expert India travel planner. Generate a partial day-by-day trip plan as STRICT JSON only.",
+    "Return ONLY valid JSON (no markdown, no extra text).",
+    "",
+    "Trip details:",
+    JSON.stringify(trip),
+    "",
+    `Generate ONLY days ${fromDay} through ${toDay} (${chunkDays} day(s)).`,
+    `Dates for this chunk: ${chunkStartDate} through ${chunkEndDate}.`,
+    `Budget for this chunk: about ₹${chunkBudget} (part of ₹${trip.budgetInr} total).`,
+    context?.lastCity
+      ? `Continue from where the previous chunk ended (around ${context.lastCity}).`
+      : "",
+    context?.daysSoFarCost != null
+      ? `Spent so far: about ₹${context.daysSoFarCost}. Stay within the remaining budget.`
+      : "",
+    "",
+    "Rules:",
+    "- Each day object must use the correct day number (1-indexed).",
+    "- Use realistic INR costs for this chunk only.",
+    "- Include 2–4 activities per day with morning/afternoon/evening slots.",
+    "- Include breakfast, lunch, dinner suggestions.",
+    "- Use null for transport/hotel when not applicable that day.",
+    "- mapRoute: movement segments for these days only; use 0,0 for unknown coords.",
+    "",
+    "Output schema exactly:",
+    JSON.stringify({
+      days: [
+        {
+          day: "number",
+          date: "YYYY-MM-DD",
+          title: "string",
+          transport: "TransportSegment | null",
+          hotel: "HotelInfo | null",
+          activities: ["..."],
+          meals: ["..."],
+          dayTotalCost: "number",
+          notes: "string",
+        },
+      ],
+      mapRoute: [
+        {
+          from: { lat: "number", lng: "number", name: "string" },
+          to: { lat: "number", lng: "number", name: "string" },
+          mode: "flight|train|bus|cab|walk",
+          day: "number",
+        },
+      ],
+    }),
+    "",
+    "Now produce the JSON:",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function fillChunkDates(
+  days: z.infer<typeof JourneyDaySchema>[],
+  startDate: string,
+) {
+  for (const day of days) {
+    if (!day.date) {
+      day.date = addDays(startDate, day.day - 1);
+    }
+  }
+}
+
+export async function generateFullJourneyChunk(input: {
+  trip: FullTripInput;
+  fromDay: number;
+  toDay: number;
+  context?: JourneyChunkContext;
+}) {
+  const { trip, fromDay, toDay, context } = input;
+  if (fromDay < 1 || toDay > trip.days || fromDay > toDay) {
+    throw new Error("Invalid day range for plan chunk");
+  }
+
+  const key = requireGeminiKey();
+  const modelId = effectiveGeminiModelId(process.env.GEMINI_MODEL);
+  const result = await generateContentWithRetry(
+    key,
+    modelId,
+    buildChunkPrompt(trip, fromDay, toDay, context),
+  );
+  const chunk = ChunkPlanSchema.parse(parseJson(result.response.text().trim()));
+  fillChunkDates(chunk.days, trip.startDate);
+  return chunk;
+}
+
 async function enrichMapRoute(plan: FullJourneyPlan) {
   const cache = new Map<string, { lat: number; lng: number }>();
   const maxLookups = plan.days.length > 7 ? 4 : 10;

@@ -1,0 +1,1 @@
+{"version":1,"functions":{"/api/planner/full-journey-chunk":{"maxDuration":26},"/api/planner/full-journey":{"maxDuration":60},"/api/planner/journey-adjust":{"maxDuration":60},"/api/planner/packing-list":{"maxDuration":60}}}

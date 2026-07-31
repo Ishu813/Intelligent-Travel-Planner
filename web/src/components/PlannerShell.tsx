@@ -5,6 +5,13 @@ import { MapView } from "@/components/MapView";
 import { JourneyPlanView } from "@/components/JourneyPlanView";
 import { AuthBar } from "@/components/AuthBar";
 import { getPlannerApiBaseUrl } from "@/lib/apiBaseUrl";
+import {
+  buildChunkContext,
+  getJourneyChunkRanges,
+  mergeJourneyChunks,
+  shouldUseChunkedGeneration,
+  type JourneyChunkResponse,
+} from "@/lib/journeyChunks";
 import { parsePlannerApiError } from "@/lib/plannerApiError";
 import type {
   FullJourneyPlan,
@@ -57,6 +64,7 @@ export function PlannerShell() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [genSeconds, setGenSeconds] = useState(0);
+  const [genProgress, setGenProgress] = useState<string | null>(null);
   const genTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // AI adjustment
@@ -89,6 +97,37 @@ export function PlannerShell() {
   }
   useEffect(() => () => stopTimer(), []);
 
+  async function fetchPlannerPlan(body: unknown) {
+    const res = await fetch(`${apiBase}/planner/full-journey`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const raw = await res.text();
+      throw new Error(parsePlannerApiError(raw, res.status));
+    }
+    return (await res.json()) as FullJourneyPlan;
+  }
+
+  async function fetchPlannerChunk(payload: {
+    trip: FullTripInput;
+    fromDay: number;
+    toDay: number;
+    context?: ReturnType<typeof buildChunkContext>;
+  }) {
+    const res = await fetch(`${apiBase}/planner/full-journey-chunk`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const raw = await res.text();
+      throw new Error(parsePlannerApiError(raw, res.status));
+    }
+    return (await res.json()) as JourneyChunkResponse;
+  }
+
   async function generate() {
     if (!trip.from.trim() || !trip.to.trim()) {
       setGenError("Please enter both a starting city and a destination.");
@@ -96,6 +135,7 @@ export function PlannerShell() {
     }
     setGenerating(true);
     setGenError(null);
+    setGenProgress(null);
     setPlan(null);
     setPreviousPlan(null);
     setChangedDays([]);
@@ -103,17 +143,28 @@ export function PlannerShell() {
     setAdjustError(null);
     startTimer();
     try {
-      const res = await fetch(`${apiBase}/planner/full-journey`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(trip),
-      });
-      if (!res.ok) {
-        const raw = await res.text();
-        throw new Error(parsePlannerApiError(raw, res.status));
+      if (shouldUseChunkedGeneration(trip.days)) {
+        const ranges = getJourneyChunkRanges(trip.days);
+        const chunks: JourneyChunkResponse[] = [];
+        let context: ReturnType<typeof buildChunkContext> | undefined;
+
+        for (const { fromDay, toDay } of ranges) {
+          setGenProgress(`Generating days ${fromDay}–${toDay}…`);
+          const chunk = await fetchPlannerChunk({
+            trip,
+            fromDay,
+            toDay,
+            context,
+          });
+          chunks.push(chunk);
+          context = buildChunkContext(chunks.flatMap((item) => item.days));
+        }
+
+        setPlan(mergeJourneyChunks(trip, chunks));
+      } else {
+        setGenProgress("Generating your plan…");
+        setPlan(await fetchPlannerPlan(trip));
       }
-      const data = (await res.json()) as FullJourneyPlan;
-      setPlan(data);
     } catch (e) {
       setGenError(
         e instanceof Error
@@ -122,6 +173,7 @@ export function PlannerShell() {
       );
     } finally {
       setGenerating(false);
+      setGenProgress(null);
       stopTimer();
     }
   }
@@ -388,7 +440,7 @@ export function PlannerShell() {
                 {generating ? (
                   <>
                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                    Generating... {genSeconds}s
+                    {genProgress ?? "Generating..."} {genSeconds}s
                   </>
                 ) : (
                   "Generate Plan"
@@ -407,6 +459,11 @@ export function PlannerShell() {
           {/* Generating — skeleton loaders */}
           {generating && (
             <div className="space-y-3">
+              {genProgress && (
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm text-zinc-300">
+                  {genProgress}
+                </div>
+              )}
               <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 animate-pulse">
                 <div className="h-4 bg-zinc-800 rounded w-1/2 mb-2" />
                 <div className="h-2.5 bg-zinc-800 rounded w-3/4 mb-4" />

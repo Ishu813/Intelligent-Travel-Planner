@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{\"components/MapView.tsx -> leaflet\":{\"id\":\"components/MapView.tsx -> leaflet\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_leaflet_dist_leaflet-src_js.js\"]}}"
+self.__REACT_LOADABLE_MANIFEST='{"components/MapView.tsx -> leaflet":{"id":7465,"files":["static/chunks/77cbbdfc.4f7c0ba38cad2152.js"]}}';

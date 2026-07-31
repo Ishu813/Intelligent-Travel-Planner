@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateFullJourney } from "@trip-planner/api/full-journey";
 
+// Netlify/Vercel read this at build time; Netlify free tier still caps at 10s unless raised by support.
+export const maxDuration = 60;
+
 const fullTripZ = z.object({
   from: z.string().min(1),
   to: z.string().min(1),
@@ -16,6 +19,16 @@ const fullTripZ = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    return NextResponse.json(
+      {
+        error:
+          "Missing GEMINI_API_KEY. Add it under Netlify → Site settings → Environment variables, then redeploy.",
+      },
+      { status: 500 },
+    );
+  }
+
   try {
     const trip = fullTripZ.parse(await req.json());
     const plan = await generateFullJourney(trip);

@@ -5,6 +5,8 @@ import {
   FullJourneyPlanSchema,
 } from "@trip-planner/api/full-journey";
 
+export const maxDuration = 60;
+
 const fullTripZ = z.object({
   from: z.string().min(1),
   to: z.string().min(1),
@@ -19,6 +21,13 @@ const fullTripZ = z.object({
 });
 
 export async function POST(req: Request) {
+  if (!process.env.GEMINI_API_KEY?.trim()) {
+    return NextResponse.json(
+      { error: "Missing GEMINI_API_KEY. Configure it in your deployment environment." },
+      { status: 500 },
+    );
+  }
+
   try {
     const body = z
       .object({

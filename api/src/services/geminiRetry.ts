@@ -2,9 +2,16 @@ import {
   GoogleGenerativeAI,
   GoogleGenerativeAIFetchError,
 } from "@google/generative-ai";
+import { isServerlessRuntime } from "./runtime";
 
 const DEFAULT_MODEL = "gemini-2.5-flash";
-const MAX_ATTEMPTS_PER_MODEL = 5;
+
+function maxAttemptsPerModel() {
+  if (isServerlessRuntime()) return 2;
+  const fromEnv = Number(process.env.GEMINI_MAX_ATTEMPTS);
+  if (Number.isFinite(fromEnv) && fromEnv >= 1) return Math.floor(fromEnv);
+  return 5;
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -48,14 +55,16 @@ export async function generateContentWithRetry(
     fallbackId && fallbackId !== modelId ? [modelId, fallbackId] : [modelId];
   let lastErr: unknown;
 
+  const maxAttempts = maxAttemptsPerModel();
+
   for (const mid of chain) {
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const model = genAI.getGenerativeModel({ model: mid });
       try {
         return await model.generateContent(prompt);
       } catch (e) {
         lastErr = e;
-        if (!isRetryableGeminiError(e) || attempt === MAX_ATTEMPTS_PER_MODEL) {
+        if (!isRetryableGeminiError(e) || attempt === maxAttempts) {
           if (chain.length > 1 && mid === modelId && isRetryableGeminiError(e)) {
             break;
           }

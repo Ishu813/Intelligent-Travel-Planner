@@ -10,6 +10,7 @@ import {
   generateContentWithRetry,
 } from "./geminiRetry";
 import { geocodePlace, sleep } from "./geocode";
+import { isServerlessRuntime } from "./runtime";
 
 const TRANSPORT_MODES = [
   "flight",
@@ -553,7 +554,10 @@ export async function generateFullJourney(
     buildFullJourneyPrompt(trip),
   );
   const plan = FullJourneyPlanSchema.parse(parseJson(result.response.text().trim()));
-  await enrichMapRoute(plan);
+  // Geocoding adds 10+ seconds; skip on serverless to stay within function timeouts.
+  if (!isServerlessRuntime()) {
+    await enrichMapRoute(plan);
+  }
   return plan;
 }
 
@@ -575,7 +579,9 @@ export async function adjustFullJourney(input: {
     input.plan,
     input.trip,
   );
-  await enrichMapRoute(parsed.plan);
+  if (!isServerlessRuntime()) {
+    await enrichMapRoute(parsed.plan);
+  }
   return parsed;
 }
 

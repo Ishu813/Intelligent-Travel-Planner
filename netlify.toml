@@ -1,0 +1,11 @@
+# Next.js app in web/ — env vars (GEMINI_API_KEY, NEXTAUTH_*, etc.) must be set in Netlify UI.
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Planner routes call Gemini and often exceed Netlify's default 10s function limit.
+# On Pro+, ask Netlify support to raise your site timeout to 26s (their maximum).

@@ -5,6 +5,7 @@ import { MapView } from "@/components/MapView";
 import { JourneyPlanView } from "@/components/JourneyPlanView";
 import { AuthBar } from "@/components/AuthBar";
 import { getPlannerApiBaseUrl } from "@/lib/apiBaseUrl";
+import { parsePlannerApiError } from "@/lib/plannerApiError";
 import type {
   FullJourneyPlan,
   FullTripInput,
@@ -109,14 +110,7 @@ export function PlannerShell() {
       });
       if (!res.ok) {
         const raw = await res.text();
-        let msg = raw || `Server error ${res.status}`;
-        try {
-          const j = JSON.parse(raw) as { error?: string };
-          if (j.error) msg = j.error;
-        } catch {
-          /* use raw */
-        }
-        throw new Error(msg);
+        throw new Error(parsePlannerApiError(raw, res.status));
       }
       const data = (await res.json()) as FullJourneyPlan;
       setPlan(data);
@@ -147,14 +141,7 @@ export function PlannerShell() {
       });
       const raw = await res.text();
       if (!res.ok) {
-        let msg = raw;
-        try {
-          const j = JSON.parse(raw) as { error?: string };
-          if (j.error) msg = j.error;
-        } catch {
-          /* use raw */
-        }
-        throw new Error(msg);
+        throw new Error(parsePlannerApiError(raw, res.status));
       }
       const data = JSON.parse(raw) as {
         reply: string;

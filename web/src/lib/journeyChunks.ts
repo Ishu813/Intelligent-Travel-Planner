@@ -5,8 +5,11 @@ import type {
   MapRouteSegment,
 } from "@trip-planner/shared/types";
 
-export const CHUNKED_PLAN_THRESHOLD = 4;
-export const JOURNEY_CHUNK_SIZE = 2;
+// A Netlify synchronous function may be limited to about 10 seconds.  A
+// detailed two-day response can still exceed that limit, so keep each AI call
+// to one day and assemble the trip in the browser.
+export const CHUNKED_PLAN_THRESHOLD = 1;
+export const JOURNEY_CHUNK_SIZE = 1;
 
 export function getJourneyChunkRanges(
   totalDays: number,
